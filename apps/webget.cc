@@ -17,6 +17,26 @@ void get_URL(const string &host, const string &path) {
     // (not just one call to read() -- everything) until you reach
     // the "eof" (end of file).
 
+    // 客户端发出连接请求，与服务器建立连接
+    TCPSocket sock;
+    auto addr = Address(host,"http");
+    sock.connect(addr);
+
+    // 客户端send http请求报文
+    sock.write("GET " + path + " HTTP/1.1\r\n");
+    sock.write("Host: " + host + "\r\n");
+    sock.write("Connection: close\r\n");
+    sock.write("\r\n");
+    sock.shutdown(SHUT_WR);  // 发送结束
+
+    // 客户端recv 服务端的回应数据
+    while(!sock.eof()) {
+        auto recv_msg = sock.read();
+        cout << recv_msg;
+    }
+    sock.close();
+
+
     cerr << "Function called: get_URL(" << host << ", " << path << ").\n";
     cerr << "Warning: get_URL() has not been implemented yet.\n";
 }
