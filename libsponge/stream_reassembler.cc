@@ -1,4 +1,5 @@
 #include "stream_reassembler.hh"
+#include <iostream>
 
 // Dummy implementation of a stream reassembler.
 
@@ -37,6 +38,11 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     if(eof) {
         _eof_flag = true;
         _eof_index = end;
+    }
+    
+    // 先处理一次eof，防止被下面的函数直接跳过，之前已经出现过eof，并且包括eof前的所有字节已经写进去，停止input
+    if (_eof_flag && _eof_index == first_unassembled) {
+        _output.end_input();
     }
 
     // case1：当前segment完全在窗口外，不处理
@@ -87,8 +93,7 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     }
 
 
-
-    // 之前已经出现过eof，并且包括eof前的所有字节已经写进去，停止input
+    // 窗口里的数据重组写入output后，再检测一次eof
     if (_eof_flag && _eof_index == _output.bytes_written()) {
         _output.end_input();
     }
