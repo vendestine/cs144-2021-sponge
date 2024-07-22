@@ -15,6 +15,7 @@ class StreamReassembler {
     std::deque <char> _buffer;
     std::deque <bool> _bitmap;
     bool _eof_flag;
+    size_t _eof_index;
     size_t _unassembled_bytes;
 
     ByteStream _output;  //!< The reassembled in-order byte stream
