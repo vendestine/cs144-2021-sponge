@@ -31,7 +31,7 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     auto first_unassembled = _output.bytes_written();
     auto first_unacceptable = first_unread + _capacity;
     
-    // data在字节流中的区间 [index, index + data.size()), 注意是左开右闭
+    // data在字节流中的区间 [index, index + data.size()), 注意是左闭右开
     auto start = index, end = index + data.size(); 
     
     // 当segment的eof为true，说明是最后一段，记录segment最后一位的索引
