@@ -1,13 +1,15 @@
-#ifndef SPONGE_LIBSPONGE_TCP_SENDER_HH
-#define SPONGE_LIBSPONGE_TCP_SENDER_HH
+#ifndef __TCP_SENDER__
+#define __TCP_SENDER__
 
 #include "byte_stream.hh"
+#include "retransmission_timer.hh"
 #include "tcp_config.hh"
 #include "tcp_segment.hh"
 #include "wrapping_integers.hh"
 
 #include <functional>
 #include <queue>
+#include <list>
 
 //! \brief The "sender" part of a TCP implementation.
 
@@ -31,6 +33,27 @@ class TCPSender {
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
+
+    // 重传定时器
+    RetransmissionTimer _retransmission_timer;
+
+    // 接收端的ack
+    uint64_t _receiver_ack{0};
+
+    // 接收端的窗口大小
+    uint64_t _receiver_window_size{1};
+
+    // 接收端还在窗口的tcp segments队列
+    std::queue<TCPSegment> _outstanding_segments{};
+
+    // 重传次数
+    unsigned int _consecutive_retransmissions{0};
+
+    // syn flag, fin flag
+    bool _set_syn_flag{false}, _set_fin_flag{false};
+
+    // helper function 判断窗口是否full
+    bool window_not_full(uint64_t window_size) const { return window_size > bytes_in_flight(); }
 
   public:
     //! Initialize a TCPSender
@@ -89,4 +112,6 @@ class TCPSender {
     //!@}
 };
 
-#endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH
+#endif /* __TCP_SENDER__ */
+
+

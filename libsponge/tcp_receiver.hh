@@ -65,4 +65,4 @@ class TCPReceiver {
     //!@}
 };
 
-#endif  /* __TCP_RECEIVER__ */
+#endif /* __TCP_RECEIVER__ */

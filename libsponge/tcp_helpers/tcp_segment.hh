@@ -1,5 +1,5 @@
-#ifndef SPONGE_LIBSPONGE_TCP_SEGMENT_HH
-#define SPONGE_LIBSPONGE_TCP_SEGMENT_HH
+#ifndef __TCP_SEGMENT__
+#define __TCP_SEGMENT__
 
 #include "buffer.hh"
 #include "tcp_header.hh"
@@ -33,4 +33,4 @@ class TCPSegment {
     size_t length_in_sequence_space() const;
 };
 
-#endif  // SPONGE_LIBSPONGE_TCP_SEGMENT_HH
+#endif /* __TCP_SEGMENT__ */
