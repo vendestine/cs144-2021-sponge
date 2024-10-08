@@ -1,3 +1,4 @@
+#include "address.hh"
 #include "socket.hh"
 #include "util.hh"
 
@@ -16,6 +17,24 @@ void get_URL(const string &host, const string &path) {
     // Then you'll need to print out everything the server sends back,
     // (not just one call to read() -- everything) until you reach
     // the "eof" (end of file).
+
+    // 创建客户端socket，发出http连接请求
+    TCPSocket sock;
+    auto address = Address(host, "http");
+    sock.connect(address);
+
+    // 发送http请求报文
+    sock.write("GET " + path + " HTTP/1.1\r\n");
+    sock.write("Host: " + host + "\r\n");
+    sock.write("Connection: close\r\n");
+    sock.write("\r\n");
+
+    // 循环读取服务端返回的信息并打印
+    while (!sock.eof()) {
+        auto str = sock.read();
+        std::cout << str;
+    }
+    sock.close();
 
     cerr << "Function called: get_URL(" << host << ", " << path << ").\n";
     cerr << "Warning: get_URL() has not been implemented yet.\n";
