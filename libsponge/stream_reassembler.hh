@@ -4,7 +4,9 @@
 #include "byte_stream.hh"
 
 #include <cstdint>
+#include <deque>
 #include <string>
+#include <vector>
 
 //! \brief A class that assembles a series of excerpts from a byte stream (possibly out of order,
 //! possibly overlapping) into an in-order byte stream.
@@ -14,6 +16,15 @@ class StreamReassembler {
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
+
+    std::deque<char> _window{};
+    std::deque<bool> _bitmap{};
+    size_t _bytes_in_window{};
+    size_t _window_start{};
+    size_t _window_size{_capacity};
+
+    bool _eof{false};
+    size_t _eof_segment_end{};
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
