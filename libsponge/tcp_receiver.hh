@@ -1,5 +1,5 @@
-#ifndef SPONGE_LIBSPONGE_TCP_RECEIVER_HH
-#define SPONGE_LIBSPONGE_TCP_RECEIVER_HH
+#ifndef __TCP_RECEIVER__
+#define __TCP_RECEIVER__
 
 #include "byte_stream.hh"
 #include "stream_reassembler.hh"
@@ -19,6 +19,8 @@ class TCPReceiver {
 
     //! The maximum number of bytes we'll store.
     size_t _capacity;
+
+    std::optional<WrappingInt32> _isn{};
 
   public:
     //! \brief Construct a TCP receiver
@@ -63,4 +65,4 @@ class TCPReceiver {
     //!@}
 };
 
-#endif  // SPONGE_LIBSPONGE_TCP_RECEIVER_HH
+#endif /* __TCP_RECEIVER__ */
