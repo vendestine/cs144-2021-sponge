@@ -2,6 +2,7 @@
 #define SPONGE_LIBSPONGE_TCP_SENDER_HH
 
 #include "byte_stream.hh"
+#include "retransmission_timer.hh"
 #include "tcp_config.hh"
 #include "tcp_segment.hh"
 #include "wrapping_integers.hh"
@@ -31,6 +32,14 @@ class TCPSender {
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
+
+    uint64_t _receiver_ackno{0};
+    uint64_t _receiver_window_size{0};
+    RetransmissionTimer _timer;
+    uint32_t _consecutive_retransmissions{0};
+    bool _syn_sent{}, _fin_sent{};
+    std::queue<TCPSegment> _outstanding_segments{};
+    uint64_t _bytes_in_fight{0};
 
   public:
     //! Initialize a TCPSender
@@ -87,6 +96,8 @@ class TCPSender {
     //! \brief relative seqno for the next byte to be sent
     WrappingInt32 next_seqno() const { return wrap(_next_seqno, _isn); }
     //!@}
+
+    void send_segment(TCPSegment &segment);
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH
