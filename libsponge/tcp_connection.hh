@@ -107,4 +107,3 @@ class TCPConnection {
 };
 
 #endif /* __TCP_CONNECTION__ */
-

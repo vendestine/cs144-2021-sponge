@@ -27,6 +27,8 @@ size_t TCPConnection::unassembled_bytes() const { return _receiver.unassembled_b
 size_t TCPConnection::time_since_last_segment_received() const { return _time_since_last_segment_received; }
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
+    _time_since_last_segment_received = 0;
+
     // 1. if the rst (reset) flag is set
     if (seg.header().rst) {
         set_error();
@@ -42,7 +44,12 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 
     // 3. if the ack flag is set, tells the TCPSender
     if (seg.header().ack) {
+        // ack_rst特殊情况，listen时收到ack直接丢弃！
+        if (!_receiver.ackno().has_value())
+            return;
         _sender.ack_received(seg.header().ackno, seg.header().win);
+        _sender.fill_window();
+        send_complete_segment();
     }
 
     // 4. if the incoming segment occupied any sequence numbers
@@ -179,6 +186,5 @@ TCPConnection::~TCPConnection() {
         std::cerr << "Exception destructing TCP FSM: " << e.what() << std::endl;
     }
 }
-
 
 // checkout test

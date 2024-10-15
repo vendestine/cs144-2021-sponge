@@ -1,5 +1,5 @@
-#ifndef SPONGE_LIBSPONGE_TCP_EXPECTATION_HH
-#define SPONGE_LIBSPONGE_TCP_EXPECTATION_HH
+#ifndef __TCP_EXPECTATION__
+#define __TCP_EXPECTATION__
 
 #include "tcp_config.hh"
 #include "tcp_expectation_forward.hh"
@@ -564,4 +564,4 @@ struct Close : public TCPAction {
     void execute(TCPTestHarness &harness) const { harness._fsm.end_input_stream(); }
 };
 
-#endif  // SPONGE_LIBSPONGE_TCP_EXPECTATION_HH
+#endif /* __TCP_EXPECTATION__ */
