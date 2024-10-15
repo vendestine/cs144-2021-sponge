@@ -1,5 +1,5 @@
-#ifndef SPONGE_LIBSPONGE_TCP_FACTORED_HH
-#define SPONGE_LIBSPONGE_TCP_FACTORED_HH
+#ifndef __TCP_CONNECTION__
+#define __TCP_CONNECTION__
 
 #include "tcp_config.hh"
 #include "tcp_receiver.hh"
@@ -21,7 +21,17 @@ class TCPConnection {
     //! in case the remote TCPConnection doesn't know we've received its whole stream?
     bool _linger_after_streams_finish{true};
 
+    size_t _time_since_last_segment_received{0};
+    bool _active{true};
+
   public:
+    void add_ack_and_window_to_segment(TCPSegment &segment);
+    void send_complete_segment();
+    bool check_inbound_stream_end();
+    bool check_outbound_stream_end();
+    void set_error();
+    void send_rst_segment();
+
     //! \name "Input" interface for the writer
     //!@{
 
@@ -96,4 +106,5 @@ class TCPConnection {
     //!@}
 };
 
-#endif  // SPONGE_LIBSPONGE_TCP_FACTORED_HH
+#endif /* __TCP_CONNECTION__ */
+
