@@ -1,12 +1,19 @@
 #ifndef SPONGE_LIBSPONGE_NETWORK_INTERFACE_HH
 #define SPONGE_LIBSPONGE_NETWORK_INTERFACE_HH
 
+#include "address.hh"
 #include "ethernet_frame.hh"
+#include "ipv4_datagram.hh"
 #include "tcp_over_ip.hh"
 #include "tun.hh"
 
+#include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <queue>
+#include <map>
+#include <list>
+#include <sys/types.h>
 
 //! \brief A "network interface" that connects IP (the internet layer, or network layer)
 //! with Ethernet (the network access layer, or link layer).
@@ -39,6 +46,32 @@ class NetworkInterface {
 
     //! outbound queue of Ethernet frames that the NetworkInterface wants sent
     std::queue<EthernetFrame> _frames_out{};
+
+    // arp_cache table中的 mac地址和record_time
+    struct EthernetEntry {
+      EthernetAddress _mac;
+      size_t _time;
+    };
+
+    // datagram_cache queue中的entry
+    struct DatagramCacheEntry {
+      Address _ip;
+      InternetDatagram _datagram;
+    };
+
+    // arp_cache table
+    std::map<uint32_t, EthernetEntry> _arp_cache_table{};
+
+    // datagram_cache queue
+    // 在对某ip，发送arp request后，在拿到arp reply前，需要缓存对该ip发送过的 ipdatagram
+    // 此时可以缓存对多个ip的多个datagram，所以把<IP，ipdatagram>放入queue中
+    std::list<DatagramCacheEntry> _datagram_cache_queue{};
+
+    // 对某ip，发送arp request发送之后，需要记录发送了多久
+    std::map<uint32_t, size_t> ip_arp_request_time{};
+
+    // timer
+    size_t _time_counter{};
 
   public:
     //! \brief Construct a network interface with given Ethernet (network-access-layer) and IP (internet-layer) addresses

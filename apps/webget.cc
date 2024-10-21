@@ -21,7 +21,8 @@ void get_URL(const string &host, const string &path) {
 
     // 创建客户端socket，发出http连接请求
     // TCPSocket sock;
-    CS144TCPSocket sock;
+    // CS144TCPSocket sock;
+    FullStackSocket sock;
     auto address = Address(host, "http");
     sock.connect(address);
 
