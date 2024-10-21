@@ -1,5 +1,6 @@
 #include "network_interface.hh"
 
+#include "address.hh"
 #include "arp_message.hh"
 #include "buffer.hh"
 #include "ethernet_frame.hh"
@@ -37,7 +38,10 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
     // convert IP address of next hop to raw 32-bit representation (used in ARP header)
     const uint32_t next_hop_ip = next_hop.ipv4_numeric();
     
-    // 如果ip在arp_cache_table中，直接封装成frame，然后发送
+    // 记录下一跳的ip地址
+    _next_hop_ip = next_hop_ip;
+    
+    // 如果next_hop_ip在arp_cache_table中，直接封装成frame，然后发送
     if (_arp_cache_table.count(next_hop_ip)) {
         EthernetFrame frame;
         frame.header().src = _ethernet_address;
@@ -46,20 +50,21 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
         frame.payload() = dgram.serialize();
         _frames_out.push(frame);
     }
-    // ip不在arp_cache_table中，缓存datagram，发送arp request
+    // 如果next_hop_ip不在arp_cache_table中，缓存datagram，发送arp request
     else {
         // 把datagram缓存起来
-        _datagram_cache_queue.emplace_back(DatagramCacheEntry{next_hop, dgram});
+        _datagram_cache_queue.emplace(dgram);
 
-        // 如果对该ip的arp request已经发过(且没超过5s) 不再发送arp request
+        // arp request已经发过(且没超过5s) 不再发送arp request
         if (ip_arp_request_time.count(next_hop_ip)) return;
 
-        // 对该ip发送arp request
+        // 发送arp request
+        // header
         EthernetFrame arp_request_frame;
         arp_request_frame.header().dst = ETHERNET_BROADCAST;
         arp_request_frame.header().src = _ethernet_address;
         arp_request_frame.header().type = EthernetHeader::TYPE_ARP;
-        
+        // payload
         ARPMessage arp_request_message;
         arp_request_message.opcode = ARPMessage::OPCODE_REQUEST;
         arp_request_message.sender_ethernet_address = _ethernet_address;
@@ -67,7 +72,7 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
         arp_request_message.target_ethernet_address = {};
         arp_request_message.target_ip_address = next_hop_ip;
         arp_request_frame.payload() = BufferList(arp_request_message.serialize());
-        
+        // send and record time
         _frames_out.push(arp_request_frame);
         ip_arp_request_time[next_hop_ip] = _time_counter;
     } 
@@ -110,21 +115,19 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
                 arp_reply_message.target_ethernet_address = arp_message.sender_ethernet_address;
                 arp_reply_message.target_ip_address = arp_message.sender_ip_address;
                 arp_reply_frame.payload() = BufferList(arp_reply_message.serialize());
-            
+                // send
                 _frames_out.push(arp_reply_frame);
             }
             // receive arp reply, send datagram cache
             if (arp_message.opcode == ARPMessage::OPCODE_REPLY) {
-                for (auto it = _datagram_cache_queue.begin(); it != _datagram_cache_queue.end();) {
-                    // 收到某ip的arp reply，就将对该ip缓存的datagram全部发出去
-                    if (it->_ip.ipv4_numeric() == arp_message.sender_ip_address) {
-                        send_datagram(it->_datagram, it->_ip);
-                        _datagram_cache_queue.erase(it ++);
-                    }
-                    else it++;
+                while (!_datagram_cache_queue.empty()) {
+                    // if (_next_hop_ip == arp_message.sender_ip_address) 一定是下一跳发过来的reply，所以不需要判断了
+                    auto datagram = _datagram_cache_queue.front();
+                    _datagram_cache_queue.pop();
+                    send_datagram(datagram, Address::from_ipv4_numeric(_next_hop_ip));
                 }
-                // 此时对该ip的arp_request完成
-                ip_arp_request_time.erase(arp_message.sender_ip_address);
+                // 此时对next_hop_ip的arp_request完成
+                ip_arp_request_time.erase(_next_hop_ip);
             }
         }
     }
@@ -147,14 +150,15 @@ void NetworkInterface::tick(const size_t ms_since_last_tick) {
     // ip_arp_request_time中ttl超过5s的entry，重发arp request
     for (auto it = ip_arp_request_time.begin(); it != ip_arp_request_time.end(); it++) {
         auto ip = it->first;
-        auto arp_request_time = it->second;
+        auto& arp_request_time = it->second;
         if (_time_counter - arp_request_time >= 5 * 1000) {
             // 对该ip发送arp request
             EthernetFrame arp_request_frame;
+            // header
             arp_request_frame.header().dst = ETHERNET_BROADCAST;
             arp_request_frame.header().src = _ethernet_address;
             arp_request_frame.header().type = EthernetHeader::TYPE_ARP;
-            
+            // payload
             ARPMessage arp_request_message;
             arp_request_message.opcode = ARPMessage::OPCODE_REQUEST;
             arp_request_message.sender_ethernet_address = _ethernet_address;
@@ -162,9 +166,9 @@ void NetworkInterface::tick(const size_t ms_since_last_tick) {
             arp_request_message.target_ethernet_address = {};
             arp_request_message.target_ip_address = ip;
             arp_request_frame.payload() = BufferList(arp_request_message.serialize());
-            
+            // send
             _frames_out.push(arp_request_frame);
-            ip_arp_request_time[ip] = _time_counter;
+            arp_request_time = _time_counter;
         }
     }
 }

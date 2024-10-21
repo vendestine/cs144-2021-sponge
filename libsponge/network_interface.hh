@@ -47,28 +47,24 @@ class NetworkInterface {
     //! outbound queue of Ethernet frames that the NetworkInterface wants sent
     std::queue<EthernetFrame> _frames_out{};
 
-    // arp_cache table中的 mac地址和record_time
+    // 下一跳的ip地址，每个networkInterface对象实际上只服务于 当前点 到 下一跳
+    uint32_t _next_hop_ip {};
+
+    // arp_cache table中的 mac addr和record_time
     struct EthernetEntry {
       EthernetAddress _mac;
       size_t _time;
     };
 
-    // datagram_cache queue中的entry
-    struct DatagramCacheEntry {
-      Address _ip;
-      InternetDatagram _datagram;
-    };
-
     // arp_cache table
-    std::map<uint32_t, EthernetEntry> _arp_cache_table{};
+    std::unordered_map<uint32_t, EthernetEntry> _arp_cache_table{};
 
     // datagram_cache queue
-    // 在对某ip，发送arp request后，在拿到arp reply前，需要缓存对该ip发送过的 ipdatagram
-    // 此时可以缓存对多个ip的多个datagram，所以把<IP，ipdatagram>放入queue中
-    std::list<DatagramCacheEntry> _datagram_cache_queue{};
+    // 在对next_hop_ip，发送arp request后，在拿到arp reply前，需要缓存对next_hop_ip发送过的 ipdatagram
+    std::queue<InternetDatagram> _datagram_cache_queue{};
 
-    // 对某ip，发送arp request发送之后，需要记录发送了多久
-    std::map<uint32_t, size_t> ip_arp_request_time{};
+    // 对next_hop，发送arp request发送之后，需要记录发送了多久
+    std::unordered_map<uint32_t, size_t> ip_arp_request_time{};
 
     // timer
     size_t _time_counter{};
