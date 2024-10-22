@@ -1,8 +1,10 @@
 #ifndef SPONGE_LIBSPONGE_ROUTER_HH
 #define SPONGE_LIBSPONGE_ROUTER_HH
 
+#include "address.hh"
 #include "network_interface.hh"
 
+#include <cstdint>
 #include <optional>
 #include <queue>
 
@@ -48,6 +50,23 @@ class Router {
     //! as specified by the route with the longest prefix_length that matches the
     //! datagram's destination address.
     void route_one_datagram(InternetDatagram &dgram);
+    
+    // 路由表里的entry(forwarind rule)
+    struct RouteRule {
+        uint32_t route_prefix;
+        uint8_t prefix_length;
+        std::optional<Address> next_hop;
+        size_t interface_num;
+        RouteRule(uint32_t route_prefix_, uint8_t prefix_length_, std::optional<Address> next_hop_, size_t interface_num_):
+        route_prefix(route_prefix_), prefix_length(prefix_length_), next_hop(next_hop_), interface_num(interface_num_)
+        {}
+    };
+
+    // 路由表
+    std::vector<RouteRule> _route_table{};
+
+    // helper function 得到route rule中网络号的掩码
+    uint32_t get_mask(uint8_t prefix_length);
 
   public:
     //! Add an interface to the router
