@@ -15,93 +15,68 @@ void DUMMY_CODE(Targs &&.../* unused */) {}
 using namespace std;
 
 StreamReassembler::StreamReassembler(const size_t capacity)
-    : _buffer(capacity, '\0')
-    , _bitmap(capacity, false)
-    , _eof_flag(false)
-    , _eof_index(0)
-    , _unassembled_bytes(0)
-    , _output(capacity)
-    , _capacity(capacity) {}
+    : _output(capacity), _capacity(capacity), _window(capacity, '\0') {}
 
 //! \details This function accepts a substring (aka a segment) of bytes,
 //! possibly out-of-order, from the logical stream, and assembles any newly
 //! contiguous substrings and writes them into the output stream in order.
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
-    // 初始化 三个重要的变量
-    auto first_unread = _output.bytes_read();
-    auto first_unassembled = _output.bytes_written();
-    auto first_unacceptable = first_unread + _capacity;
-
-    // data在字节流中的区间 [index, index + data.size()), 注意是左闭右开
-    auto start = index, end = index + data.size();
-
-    // 当segment的eof为true，说明是最后一段，记录segment最后一位的索引
+    // eof出现过，同时记录该segment的结尾
     if (eof) {
-        _eof_flag = true;
-        _eof_index = end;
+        _eof = true;
+        _eof_segment_end = index + data.size();
     }
 
-    // 先处理一次eof，防止被下面的函数直接跳过，之前已经出现过eof，并且包括eof前的所有字节已经写进去，停止input
-    if (_eof_flag && _eof_index == first_unassembled) {
-        _output.end_input();
-    }
+    // 每次push_substring之前，因为内部bytestream可能已经read了一些bytes，window会变化
+    _window_size = _capacity - _output.buffer_size();
+    _window.resize(_window_size, '\0');
+    _bitmap.resize(_window_size, false);
 
-    // case1：当前segment完全在窗口外，不处理
-    if (end <= first_unassembled || start >= first_unacceptable)
+    // case1: data 和 window没有交集，直接丢弃
+    if (index + data.size() <= _window_start || index >= _window_start + _window_size) {
+        if (_eof && empty() && _eof_segment_end <= _window_start + _window_size)  // 不要忘记判断是否eof
+            _output.end_input();
         return;
+    }
 
-    // case 2: 当前segment的左部分和窗口有交集（可能完全在窗口里），交集的部分放入窗口
-    if (start >= first_unassembled) {
-        end = min(end, first_unacceptable);
-        auto len = end - start;
-        auto offset = index - first_unassembled;
+    // case2: data 和 window有交集
+    // 具体又可以分为 很多部分 data和window左部分重合，和window右部分重合，data在window里，data包含window
+    // 处理的逻辑可以是一致的，截取data在window的部分即可
+    size_t data_start = max(index, _window_start);
+    size_t data_end = min(index + data.size(), _window_start + _window_size);
 
-        for (size_t i = 0; i < len; i++) {
-            if (_bitmap[i + offset])
-                continue;  //已经在窗口里了，重复字符直接丢弃
-            _buffer[i + offset] = data[i];
-            _bitmap[i + offset] = true;
-            ++_unassembled_bytes;
+    // 将data放入window里
+    for (auto i = data_start; i < data_end; i++) {
+        size_t window_index = i - _window_start;
+        size_t data_index = i - index;
+        if (_bitmap[window_index] == false) {
+            _window[window_index] = data[data_index];
+            _bitmap[window_index] = true;
+            _bytes_in_window++;
         }
     }
 
-    // case 3: 当前segment的右部分和窗口有交集 或者 segment覆盖了窗口，交集的部分放入窗口
-    else if (end > first_unassembled) {
-        start = max(start, first_unassembled);
-        end = min(end, first_unacceptable);
-        auto len = end - start;
-        auto offset = first_unassembled - index;
-
-        for (size_t i = 0; i < len; i++) {
-            if (_bitmap[i])
-                continue;
-            _buffer[i] = data[i + offset];
-            _bitmap[i] = true;
-            ++_unassembled_bytes;
-        }
-    }
-
-    // 把_buffer窗口里的连续字节写入byteStream里
-    string str;
-    while (_bitmap.front()) {
-        auto c = _buffer.front();
-        str.push_back(c);
-        _buffer.pop_front();
+    // check window里 是否有满足条件的字符串，如果有就写入内部的byte_stream
+    // 要从window中取字符才是符合逻辑的，而不是从data字符串中取字符
+    string str{};
+    while (!_window.empty()) {
+        if (_bitmap.front() == false)
+            break;
+        str.push_back(_window.front());
+        _window.pop_front();
         _bitmap.pop_front();
-        _buffer.push_back('\0');
-        _bitmap.push_back(false);
-    }
-    if (str.size() > 0) {
-        _output.write(str);
-        _unassembled_bytes -= str.size();
+        _bytes_in_window--;
     }
 
-    // 窗口里的数据重组写入output后，再检测一次eof
-    if (_eof_flag && _eof_index == _output.bytes_written()) {
+    _output.write(str);
+    _window_start = _output.bytes_written();
+    _window_size = _capacity - _output.buffer_size();
+
+    // 如果窗口为空，eof_segment出现过，eof_segment的最后一位也已经被窗口接收，不再往byte_stream里写入
+    if (_eof && empty() && _eof_segment_end <= _window_start + _window_size)
         _output.end_input();
-    }
 }
 
-size_t StreamReassembler::unassembled_bytes() const { return _unassembled_bytes; }
+size_t StreamReassembler::unassembled_bytes() const { return _bytes_in_window; }
 
-bool StreamReassembler::empty() const { return _unassembled_bytes == 0; }
+bool StreamReassembler::empty() const { return _bytes_in_window == 0; }

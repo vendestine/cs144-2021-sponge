@@ -14,11 +14,9 @@ using namespace std;
 //! \param n The input absolute 64-bit sequence number
 //! \param isn The initial sequence number
 WrappingInt32 wrap(uint64_t n, WrappingInt32 isn) {
-    // 重载运算符里定义了一些WrappingInt32的常用运算
-    // WrappingInt32类对象和unit64_t类对象的之间的运算，WrappingInt32对象必须放在前面，因为重载运算符只定义了这种运算
-    // 64位转32位，大值域 映射到 小值域，不会出现unit64_t对象映射到多个WrappingInt32对象的情况，所以可以直接计算
-    // unit64计算后溢出后会直接从头开始存储，满足图片上的眼球
-    return isn + static_cast<uint32_t>(n);
+    // 64位 -> 32位，大值域->小值域，映射唯一
+    // seqno = (abs_seqno + isn) mod 2^32 = abs_seqno mod 2^32 + isn mod 2^32
+    return WrappingInt32{isn + static_cast<uint32_t>(n)};
 }
 
 //! Transform a WrappingInt32 into an "absolute" 64-bit sequence number (zero-indexed)
@@ -32,12 +30,14 @@ WrappingInt32 wrap(uint64_t n, WrappingInt32 isn) {
 //! and the other stream runs from the remote TCPSender to the local TCPReceiver and
 //! has a different ISN.
 uint64_t unwrap(WrappingInt32 n, WrappingInt32 isn, uint64_t checkpoint) {
-    // 其实重载运算符里已经给了我们提示了，这里给出了wrappingint32位对象相减 返回int32_t的函数
-    // 说明希望计算真正（有正负）的偏移量
-    int32_t offset = n - wrap(checkpoint, isn);
-    int64_t result = checkpoint + offset;  // unit64_t对象 + int32_t对象 自动转化为unit64_t对象
+    // 32位 -> 64位，小值域 -> 大值域，一对多
+    // seqno可以映射到很多abs_seqno (abs_seno + k * 2^32),  我们要找的就是0-2^32之间的那个abs_seqno
+    // 注意checkpoint虽然是uint64_t, 但是为了筛选[0, 2^32)的abs_seqno，它的实际值不会超过2^33
+    // 因为只有这样，才能有选中[0, 2^32)的abs_seqno的可能
 
-    if (result < 0)
-        result = result + (1ul << 32);
-    return result;
+    int32_t diff = n - wrap(checkpoint, isn);
+    int64_t abs_seqno = checkpoint + diff;
+    if (abs_seqno < 0)
+        abs_seqno = abs_seqno + (1ul << 32);
+    return static_cast<uint64_t>(abs_seqno);
 }

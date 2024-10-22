@@ -1,14 +1,14 @@
 #ifndef __RETRANSMISSION_TIMER__
 #define __RETRANSMISSION_TIMER__
 
-#include <cstddef>
+#include <cstddef>  // size_t声明头文件
 
 class RetransmissionTimer {
   private:
-    bool _is_running{false};     // 定时器状态
-    size_t _accumulate_time{0};  // 累计时间
-    size_t _rto;                 // 当前rto
-    size_t _init_rto;            // 初始rto
+    bool _is_running{false};  // 定时器状态
+    size_t _elapsed_time{0};  // 定时器走过的时间
+    size_t _rto;              // 当前rto
+    size_t _init_rto;         // 初始rto
 
   public:
     // 构造函数
@@ -23,12 +23,11 @@ class RetransmissionTimer {
     // 定时器time_out事件处理函数
     void handle_timeout();
 
-    // 每次tick后，计算累计时间，检查是否timeout
+    // 检查定时器是否timeout
     bool check_timeout(const size_t ms_since_last_tick);
 
-    // 设置定时器
-    void set_timeout(const size_t rto_time);
-    void set_accumulate_time(const size_t accumulate_time);
+    // 重置定时器
+    void reset_timer();
 };
 
 #endif /* __RETRANSMISSION_TIMER__ */
